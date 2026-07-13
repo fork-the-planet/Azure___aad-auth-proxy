@@ -32,6 +32,7 @@ module acr 'br/public:avm/res/container-registry/registry:0.12.1' = {
     name: acrName
     location: location
     acrSku: 'Premium'
+    publicNetworkAccess: 'Disabled'
     tags: tags
   }
   dependsOn: [
