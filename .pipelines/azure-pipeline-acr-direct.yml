@@ -1,6 +1,16 @@
 trigger: none
 pr: none
 
+parameters:
+- name: azureServiceConnection
+  displayName: Azure service connection
+  type: string
+  default: ''
+- name: acrName
+  displayName: Azure Container Registry name
+  type: string
+  default: ''
+
 resources:
   repositories:
   - repository: 1ESPipelineTemplates
@@ -10,25 +20,24 @@ resources:
 
 variables:
   HELM_CHART_NAME: 'aad-auth-proxy'
-  ACR_NAME: 'aadauthproxyacr'
-  ACR_REGISTRY: 'aadauthproxyacr.azurecr.io'
+  ACR_NAME: ${{ parameters.acrName }}
+  ACR_REGISTRY: ${{ format('{0}.azurecr.io', parameters.acrName) }}
   ACR_REPOSITORY: '/public/azuremonitor/auth-proxy/prod/aad-auth-proxy/images/aad-auth-proxy'
   ACR_REPOSITORY_HELM: '/public/azuremonitor/auth-proxy/prod/aad-auth-proxy/helmchart'
   MCR_REGISTRY: 'mcr.microsoft.com'
   MCR_REPOSITORY: '/azuremonitor/auth-proxy/prod/aad-auth-proxy/images/aad-auth-proxy'
-  AZURE_SERVICE_CONNECTION: '79f5e9cb-7ef2-4545-a468-bbdf2e85feba'
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     pool:
-      name: Azure Pipelines
-      image: ubuntu-latest
+      name: nbla.core.pool.00
+      image: nbla.core.mariner
       os: linux
     sdl:
       sourceAnalysisPool:
-        name: Azure Pipelines
-        image: windows-latest
+        name: nbla.core.pool.00
+        image: nbla.core.win2022
         os: windows
     stages:
     - stage: BuildAndPush
@@ -80,7 +89,7 @@ extends:
         - task: AzureCLI@2
           displayName: 'Build: build and push image to team ACR'
           inputs:
-            azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
+            azureSubscription: ${{ parameters.azureServiceConnection }}
             scriptType: bash
             scriptLocation: inlineScript
             workingDirectory: $(Build.SourcesDirectory)/src
@@ -106,7 +115,7 @@ extends:
         - task: HelmInstaller@1
           displayName: 'Build: install Helm version'
           inputs:
-            helmVersionToInstall: latest
+            helmVersionToInstall: '3.19.2'
 
         - bash: |
             export HELM_SEMVER=$(SEMVER)
@@ -120,7 +129,7 @@ extends:
         - task: AzureCLI@2
           displayName: 'Build: push helm chart to team ACR'
           inputs:
-            azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
+            azureSubscription: ${{ parameters.azureServiceConnection }}
             scriptType: bash
             scriptLocation: inlineScript
             workingDirectory: $(Build.SourcesDirectory)/deploy/chart/

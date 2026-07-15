@@ -4,17 +4,31 @@ targetScope = 'subscription'
 param location string = 'westus'
 
 @description('Name of the resource group to create for the Azure Container Registry.')
-param resourceGroupName string = 'rg-aad-auth-proxy-acr'
+param resourceGroupName string
 
 @description('Name of the Azure Container Registry. Must be globally unique and contain only alphanumeric characters.')
 @minLength(5)
 @maxLength(50)
-param acrName string = 'aadauthproxyacr'
+param acrName string
+
+@description('IPv4 CIDR ranges allowed through the registry firewall. Supply the trusted build-pool egress IPs at deployment time; do not check them into this public repo.')
+param networkRuleSetIpRules string[]
 
 @description('Tags to apply to deployed resources.')
 param tags object = {
   workload: 'aad-auth-proxy'
 }
+
+@description('Firewall IP rules in AVM/ARM shape.')
+var formattedAcrIpRules = [for ip in networkRuleSetIpRules: {
+  action: 'Allow'
+  value: ip
+}]
+
+@description('Firewall IP rules in AVM/ARM shape. Fail closed if no valid IP rules are supplied.')
+var acrIpRules = (empty(networkRuleSetIpRules) || contains(networkRuleSetIpRules, ''))
+  ? fail('networkRuleSetIpRules must include at least one trusted build-pool egress CIDR.')
+  : formattedAcrIpRules
 
 module acrResourceGroup 'br/public:avm/res/resources/resource-group:0.4.3' = {
   name: 'acr-resource-group'
@@ -32,7 +46,10 @@ module acr 'br/public:avm/res/container-registry/registry:0.12.1' = {
     name: acrName
     location: location
     acrSku: 'Premium'
-    publicNetworkAccess: 'Disabled'
+    publicNetworkAccess: 'Enabled'
+    networkRuleSetDefaultAction: 'Deny'
+    networkRuleSetIpRules: acrIpRules
+    networkRuleBypassOptions: 'None'
     tags: tags
   }
   dependsOn: [
